@@ -3,6 +3,7 @@ Django settings for Riziki App backend.
 """
 
 import os
+import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -77,19 +78,14 @@ TEMPLATES = [
     },
 ]
 
-# ─── Database — PostgreSQL ────────────────────────────────────────────────────
+# ─── Database — Automatic Environment Linkage ──────────────────────────────────
+# Falls back to local credentials only if DATABASE_URL isn't explicitly declared by host
 DATABASES = {
-    'default': {
-        'ENGINE':   'django.db.backends.postgresql',
-        'NAME':     os.getenv('DB_NAME',     'riziki_db'),
-        'USER':     os.getenv('DB_USER',     'Richkid'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'securepassword'),
-        'HOST':     os.getenv('DB_HOST',     'localhost'),
-        'PORT':     os.getenv('DB_PORT',     '5432'),
-        'OPTIONS': {
-            'connect_timeout': 10,
-        },
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL', f"postgresql://{os.getenv('DB_USER', 'Richkid')}:{os.getenv('DB_PASSWORD', 'securepassword')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'riziki_db')}"),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
 
 # ─── Custom user model ────────────────────────────────────────────────────────
@@ -109,7 +105,7 @@ TIME_ZONE     = 'Africa/Nairobi'
 USE_I18N      = True
 USE_TZ        = True
 
-# ─── Static & Media ───────────────────────────────────────────────────────────
+# ─── Static & Media — Configured for WhiteNoise ───────────────────────────────
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL   = '/media/'
