@@ -10,7 +10,7 @@ APScheduler==3.10.4
 psycopg2-binary==2.9.9
 django-filter==23.5
 whitenoise==6.6.0
-gunicorn==21.2.0
+waitress==3.0.2
 celery==5.3.6
 setuptools<81
 redis==5.0.1
