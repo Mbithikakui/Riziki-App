@@ -15,8 +15,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Security ────────────────────────────────────────────────────────────────
 SECRET_KEY   = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
-DEBUG        = os.getenv('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-gorged.ngrok-free.dev').split(',')
+DEBUG        = os.getenv('DEBUG', 'False') == 'False'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-gorged.ngrok-free.dev,riziki-backend-7of1.onrender.com').split(',')
 
 # ─── Applications ────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
