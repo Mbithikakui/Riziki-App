@@ -8,6 +8,7 @@ requests==2.31.0
 reportlab==4.0.8
 Pillow==10.1.0
 APScheduler==3.10.4
+django-apscheduler==0.6.2
 psycopg2-binary==2.9.9
 django-filter==23.5
 whitenoise==6.6.0
