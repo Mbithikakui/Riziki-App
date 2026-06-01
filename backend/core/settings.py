@@ -148,7 +148,7 @@ SIMPLE_JWT = {
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:8081,http://localhost:19006,http://pants-vitally-gorged.ngrok-free.dev'
+    'http://localhost:3000,http://localhost:8081,http://localhost:19006,http://pants-vitally-gorged.ngrok-free.dev,https://riziki-backend-7of1.onrender.com'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 
