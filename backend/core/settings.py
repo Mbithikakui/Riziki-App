@@ -15,8 +15,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Security ────────────────────────────────────────────────────────────────
 SECRET_KEY   = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
-DEBUG        = os.getenv('DEBUG', 'False') == 'False'
+DEBUG        = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-gorged.ngrok-free.dev,riziki-backend-7of1.onrender.com').split(',')
+
+# ─── CSRF Trusted Origins ─────────────────────────────────────────────────────
+# Mandatory safety layer for Django 4.0+ admin form processing in production
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    'CSRF_TRUSTED_ORIGINS',
+    'https://riziki-backend-7of1.onrender.com,http://localhost:3000'
+).split(',')
 
 # ─── Applications ────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -79,14 +86,29 @@ TEMPLATES = [
 ]
 
 # ─── Database — Automatic Environment Linkage ──────────────────────────────────
-# Falls back to local credentials only if DATABASE_URL isn't explicitly declared by host
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL', f"postgresql://{os.getenv('DB_USER', 'Richkid')}:{os.getenv('DB_PASSWORD', 'securepassword')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'riziki_db')}"),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
-}
+# Pulls directly from the single consolidated production string if available
+if os.getenv('DATABASE_URL'):
+    DATABASES = {
+        'default': dj_database_url.config(
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
+    }
+else:
+    # Local fallback parameters for development environment structures
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'riziki_db'),
+            'USER': os.getenv('DB_USER', 'Richkid'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'securepassword'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+            'OPTIONS': {
+                'connect_timeout': 10,
+            },
+        }
+    }
 
 # ─── Custom user model ────────────────────────────────────────────────────────
 AUTH_USER_MODEL = 'auth_app.AdminUser'
