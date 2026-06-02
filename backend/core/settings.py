@@ -22,7 +22,7 @@ ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-go
 # Mandatory safety layer for Django 4.0+ admin form processing in production
 CSRF_TRUSTED_ORIGINS = os.getenv(
     'CSRF_TRUSTED_ORIGINS',
-    'https://riziki-backend-7of1.onrender.com,http://localhost:3000'
+    'https://riziki-backend-7of1.onrender.com,http://localhost:3000,https://riziki-app.vercel.app'
 ).split(',')
 
 # ─── Applications ────────────────────────────────────────────────────────────
