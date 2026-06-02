@@ -2,7 +2,13 @@
 import axios from 'axios';
 import { Storage } from '../utils/storage';
 
-const BASE_URL = 'http://localhost:8000/api';
+// Detect environment production state dynamically
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Swaps to Render online endpoint automatically during production compiling 
+const BASE_URL = isProduction
+  ? 'https://riziki-backend-7of1.onrender.com/api'
+  : 'http://localhost:8000/api';
 
 const api = axios.create({ baseURL: BASE_URL });
 
