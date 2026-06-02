@@ -86,16 +86,19 @@ TEMPLATES = [
 ]
 
 # ─── Database — Automatic Environment Linkage ──────────────────────────────────
-# Pulls directly from the single consolidated production string if available
+# Cleanly configures both local Postgres structures and external Render string connections
 if os.getenv('DATABASE_URL'):
     DATABASES = {
         'default': dj_database_url.config(
+            default=os.getenv('DATABASE_URL'),
             conn_max_age=600,
             conn_health_checks=True,
+            # 🔒 Forces psycopg2 to establish an SSL/TLS handshake for external Render setups
+            ssl_require=True
         )
     }
 else:
-    # Local fallback parameters for development environment structures
+    # Local fallback parameters for pure development machine engine structures
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
