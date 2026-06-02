@@ -1,9 +1,24 @@
 {
-  "version": 2,
-  "builds": [
+  "outputDirectory": "dist",
+  "headers": [
     {
-      "src": "src/index.js",
-      "use": "@vercel/static"
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self' https://riziki-backend-7of1.onrender.com wss://*.vercel.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.stripe.com https://m.stripe.network; style-src 'self' 'unsafe-inline'; frame-src 'self' https://hipodi.com https://js.stripe.com; img-src 'self' data: https://riziki-backend-7of1.onrender.com; connect-src 'self' https://riziki-backend-7of1.onrender.com;"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
