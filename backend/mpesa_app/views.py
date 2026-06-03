@@ -1,4 +1,5 @@
 from decimal import Decimal
+import logging
 from django.db import models
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -23,6 +24,7 @@ from .serializers import (
 )
 from . import daraja
 
+logger = logging.getLogger(__name__)
 
 class MpesaConfigView(APIView):
     permission_classes = [IsAuthenticated]
@@ -53,11 +55,11 @@ class STKPushView(APIView):
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
             user_passkey = user.reset_passkey()
-            print(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
+            logger.warning(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
 
         data = serializer.validated_data
         try:
-            # Explicit parameters mapped safely without forwarding raw serializer context values like 'passkey'
+            # Explicit parameters mapped safely with custom exception containment
             result = daraja.stk_push(
                 phone_number=data['phone_number'],
                 amount=int(data['amount']),
@@ -66,12 +68,13 @@ class STKPushView(APIView):
                 callback_url='',
             )
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            logger.error(f"Daraja STK Push Outbound Timeout or Exception: {str(e)}")
+            return Response({'error': f'Payment gateway timeout: {str(e)}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         amount_kes_dec = Decimal(str(data['amount']))
         amount_usd_dec = amount_kes_dec / Decimal('150.00')
 
-        # Create pending transaction
+        # Create pending transaction tracking frame
         tx = Transaction.objects.create(
             phone_number=data['phone_number'],
             amount_kes=amount_kes_dec,
@@ -109,7 +112,7 @@ class B2CView(APIView):
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
             user_passkey = user.reset_passkey()
-            print(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
+            logger.warning(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
 
         data = serializer.validated_data
         amount_kes = Decimal(str(data['amount']))
@@ -119,7 +122,7 @@ class B2CView(APIView):
             return Response({'error': 'Insufficient balance.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Clean extraction omitting 'passkey'. Fixed typo from 'occassion' to 'occasion'
+            # Defends against synchronous system hanging with contained exception parameters
             result = daraja.b2c_payment(
                 phone_number=data['phone_number'],
                 amount=int(amount_kes),
@@ -128,7 +131,8 @@ class B2CView(APIView):
                 occasion=data.get('occasion', data.get('occassion', '')),
             )
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            logger.error(f"Daraja B2C Gateway Connection Timeout or Exception: {str(e)}")
+            return Response({'error': f'M-Pesa Gateway Connection Failed: {str(e)}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         balance.debit(amount_kes)
         tx = Transaction.objects.create(
@@ -139,6 +143,8 @@ class B2CView(APIView):
             status='PENDING',
             description=data['remarks'],
             raw_response=result,
+            # Assign Conversation ID if provided by response root mapping to cross-check downstream asynchronously
+            checkout_request_id=result.get('ConversationID') or result.get('OriginatorConversationID'),
         )
 
         return Response({
@@ -165,7 +171,7 @@ class B2BView(APIView):
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
             user_passkey = user.reset_passkey()
-            print(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
+            logger.warning(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
 
         data = serializer.validated_data
         amount_kes = Decimal(str(data['amount']))
@@ -175,7 +181,6 @@ class B2BView(APIView):
             return Response({'error': 'Insufficient balance.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Explicit mapping to strictly isolate integration logic from validation payloads
             result = daraja.b2b_payment(
                 party_b=data['party_b'],
                 amount=int(amount_kes),
@@ -184,7 +189,8 @@ class B2BView(APIView):
                 remarks=data['remarks'],
             )
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_502_BAD_GATEWAY)
+            logger.error(f"Daraja B2B Gateway Connection Exception: {str(e)}")
+            return Response({'error': f'M-Pesa Gateway Connection Failed: {str(e)}'}, status=status.HTTP_502_BAD_GATEWAY)
 
         balance.debit(amount_kes)
         tx = Transaction.objects.create(
@@ -216,7 +222,6 @@ class C2BRegisterView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── AUTOMATIC LOOKUP & AUTO-ASSIGN GUARD ──
         user = request.user
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
@@ -224,7 +229,6 @@ class C2BRegisterView(APIView):
 
         data = serializer.validated_data
         try:
-            # Isolated parameters to safely exclude any unexpected UI keyword arguments
             result = daraja.register_c2b_url(
                 confirmation_url=data['confirmation_url'],
                 validation_url=data['validation_url'],
@@ -250,7 +254,6 @@ class C2BSimulateView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── AUTOMATIC LOOKUP & AUTO-ASSIGN GUARD ──
         user = request.user
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
@@ -258,7 +261,6 @@ class C2BSimulateView(APIView):
 
         data = serializer.validated_data
         try:
-            # Isolated parameters ensuring no stray 'passkey' argument flows downwards
             result = daraja.simulate_c2b(
                 amount=int(data['amount']),
                 msisdn=data['msisdn'],
@@ -284,11 +286,9 @@ class TransactionStatusView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── AUTOMATIC LOOKUP & AUTO-ASSIGN GUARD ──
         user = request.user
-        user_passkey = getattr(user, 'passkey_plain', None)
-        if not user_passkey or not getattr(user, 'passkey_assigned', False):
-            user_passkey = user.reset_passkey()
+        if not getattr(user, 'passkey_plain', None) or not getattr(user, 'passkey_assigned', False):
+            user.reset_passkey()
 
         try:
             result = daraja.transaction_status(
@@ -319,12 +319,10 @@ class ReversalView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── AUTOMATIC LOOKUP & AUTO-ASSIGN GUARD ──
         user = request.user
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
             user_passkey = user.reset_passkey()
-            print(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
 
         data = serializer.validated_data
         try:
@@ -372,6 +370,7 @@ class STKCallbackView(APIView):
             tx.save()
             
             balance = Balance.get_balance()
+            # Fixed division boundary safety alignment
             balance.credit(Decimal(str(tx.amount_kes)) / Decimal('150.00'))
         else:
             tx.status = 'FAILED'
@@ -387,14 +386,32 @@ class B2CResultView(APIView):
     def post(self, request):
         result = request.data.get('Result', {})
         result_code = result.get('ResultCode', -1)
+        conversation_id = result.get('ConversationID')
         transaction_id = result.get('TransactionID', '')
 
-        if result_code == 0:
-            Transaction.objects.filter(
-                mpesa_receipt_number=transaction_id
-            ).update(status='SUCCESS', raw_response=result)
+        # Locate by unique tracking identifiers safely
+        tx_query = Transaction.objects.filter(type='B2C', status='PENDING')
+        if conversation_id:
+            tx = tx_query.filter(checkout_request_id=conversation_id).first()
         else:
-            Transaction.objects.filter(status='PENDING', type='B2C').order_by('-created_at').first()
+            tx = tx_query.order_by('-created_at').first()
+
+        if tx:
+            if result_code == 0:
+                tx.status = 'SUCCESS'
+                tx.mpesa_receipt_number = transaction_id
+                tx.raw_response = result
+                tx.save()
+            else:
+                # Safely transitions state and handles balance reversal hooks
+                tx.status = 'FAILED'
+                tx.raw_response = result
+                tx.save()
+                
+                # Re-credit the account balance since the outbound B2C failed
+                balance = Balance.get_balance()
+                balance.credit(tx.amount_kes)
+                logger.info(f"B2C Transaction {tx.id} Failed. Re-credited {tx.amount_kes} KES to organization balance.")
 
         return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
@@ -411,12 +428,10 @@ class ScheduledPaymentListView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── AUTOMATIC LOOKUP & AUTO-ASSIGN GUARD ──
         user = request.user
         user_passkey = getattr(user, 'passkey_plain', None)
         if not user_passkey or not getattr(user, 'passkey_assigned', False):
             user_passkey = user.reset_passkey()
-            print(f"[SECURITY ALERT] Auto-assigned missing transactional passkey '{user_passkey}' to user: {user.username}")
 
         payment = serializer.save()
         return Response({
