@@ -1,11 +1,9 @@
 from decimal import Decimal
 import logging
-from django.db import models
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-
 from transactions_app.models import Transaction
 from balance_app.models import Balance
 
@@ -369,9 +367,9 @@ class STKCallbackView(APIView):
             tx.raw_response = stk_callback
             tx.save()
             
+            # Credit the incoming payment directly into your system balance
             balance = Balance.get_balance()
-            # Fixed division boundary safety alignment
-            balance.credit(Decimal(str(tx.amount_kes)) / Decimal('150.00'))
+            balance.credit(tx.amount_kes)
         else:
             tx.status = 'FAILED'
             tx.raw_response = stk_callback
@@ -389,7 +387,6 @@ class B2CResultView(APIView):
         conversation_id = result.get('ConversationID')
         transaction_id = result.get('TransactionID', '')
 
-        # Locate by unique tracking identifiers safely
         tx_query = Transaction.objects.filter(type='B2C', status='PENDING')
         if conversation_id:
             tx = tx_query.filter(checkout_request_id=conversation_id).first()
@@ -403,12 +400,10 @@ class B2CResultView(APIView):
                 tx.raw_response = result
                 tx.save()
             else:
-                # Safely transitions state and handles balance reversal hooks
                 tx.status = 'FAILED'
                 tx.raw_response = result
                 tx.save()
                 
-                # Re-credit the account balance since the outbound B2C failed
                 balance = Balance.get_balance()
                 balance.credit(tx.amount_kes)
                 logger.info(f"B2C Transaction {tx.id} Failed. Re-credited {tx.amount_kes} KES to organization balance.")
