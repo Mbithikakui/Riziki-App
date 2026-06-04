@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, ActivityIndicator, Alert, Switch, Platform, Modal, KeyboardTypeOptions
+  TextInput, ActivityIndicator, Alert, Platform, Modal, KeyboardTypeOptions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +12,7 @@ import {
   getProfile, updateProfile, changePassword 
 } from '../api/auth';
 
-// Correct path location context for passkey operations (Bug 2 Fix)
+// Correct path location context for passkey operations
 import { 
   changePasskey, regeneratePasskey 
 } from '../api/auth_passkey';
@@ -125,7 +125,8 @@ const SettingsScreen = () => {
   const [regenResult, setRegenResult]       = useState<string | null>(null);
   const [regenRevealed, setRegenRevealed]   = useState(false);
 
-  const [mpesaEnv, setMpesaEnv] = useState('sandbox');
+  // Production Enforcement Environment Block Flag
+  const mpesaEnv = 'production';
 
   useEffect(() => {
     getProfile()
@@ -399,35 +400,29 @@ const SettingsScreen = () => {
             <SectionCard title="Environment">
               <View style={styles.envRow}>
                 <View>
-                  <Text style={styles.envLabel}>Sandbox Mode</Text>
-                  <Text style={styles.envSub}>Use Safaricom test environment</Text>
+                  <Text style={styles.envLabel}>Transaction Mode</Text>
+                  <Text style={styles.envSub}>Operational parameters for financial integrations</Text>
                 </View>
-                <Switch
-                  value={mpesaEnv === 'sandbox'}
-                  onValueChange={(v) => setMpesaEnv(v ? 'sandbox' : 'production')}
-                  trackColor={{ false: COLORS.border, true: COLORS.primary + '60' }}
-                  thumbColor={mpesaEnv === 'sandbox' ? COLORS.primary : COLORS.textMuted}
-                />
               </View>
-              <View style={[styles.envBadge, { backgroundColor: mpesaEnv === 'sandbox' ? '#FEF3C7' : '#D1FAE5' }]}>
+              <View style={[styles.envBadge, { backgroundColor: '#D1FAE5' }]}>
                 <Ionicons
-                  name={mpesaEnv === 'sandbox' ? 'flask-outline' : 'checkmark-circle-outline'}
+                  name="checkmark-circle-outline"
                   size={14}
-                  color={mpesaEnv === 'sandbox' ? '#D97706' : '#059669'}
+                  color="#059669"
                 />
-                <Text style={[styles.envBadgeText, { color: mpesaEnv === 'sandbox' ? '#D97706' : '#059669' }]}>
-                  {mpesaEnv === 'sandbox' ? 'Sandbox — Test Mode Active' : 'Production — Live Transactions'}
+                <Text style={[styles.envBadgeText, { color: '#059669' }]}>
+                  Production — Live Transactions Active
                 </Text>
               </View>
             </SectionCard>
 
             <SectionCard title="API Configuration">
               {[
-                { label: 'Shortcode',       value: '174379',                               icon: 'business-outline'    },
-                { label: 'Initiator Name',  value: 'testapi',                              icon: 'person-outline'      },
-                { label: 'Callback URL',    value: 'localhost:8000/api/mpesa/callback/',   icon: 'link-outline'        },
-                { label: 'Consumer Key',    value: '••••••••••••',                        icon: 'key-outline'         },
-                { label: 'Consumer Secret', value: '••••••••••••',                        icon: 'lock-closed-outline' },
+                { label: 'Shortcode / Till', value: 'Live Corporate Shortcode',             icon: 'business-outline'    },
+                { label: 'Initiator Name',   value: 'Authorized Operator ID',             icon: 'person-outline'      },
+                { label: 'Callback URL',     value: 'https://riziki-backend-7of1.onrender.com/api/mpesa/callback/', icon: 'link-outline' },
+                { label: 'Consumer Key',     value: '••••••••••••••••••••••••••••••••',   icon: 'key-outline'         },
+                { label: 'Consumer Secret',  value: '••••••••••••••••••••••••••••••••',   icon: 'lock-closed-outline' },
               ].map((item) => (
                 <View key={item.label} style={styles.configRow}>
                   <View style={styles.configIcon}>
@@ -440,9 +435,9 @@ const SettingsScreen = () => {
                 </View>
               ))}
               <View style={styles.infoBox}>
-                <Ionicons name="warning-outline" size={16} color="#D97706" />
-                <Text style={[styles.infoText, { color: '#D97706' }]}>
-                  To update API credentials, edit the .env file and restart the server.
+                <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.primary} />
+                <Text style={[styles.infoText, { color: COLORS.primary }]}>
+                  API infrastructure metrics are managed directly via environment variables inside Render dashboard structures.
                 </Text>
               </View>
             </SectionCard>
@@ -476,27 +471,6 @@ const SettingsScreen = () => {
                   <Text style={styles.aboutValue}>{row.value}</Text>
                 </View>
               ))}
-            </SectionCard>
-
-            <SectionCard title="Default Credentials">
-              <View style={styles.credBox}>
-                {[
-                  { key: 'Username', val: 'Admin'    },
-                  { key: 'Password', val: 'Admin123' },
-                  { key: 'Passkey',  val: '1234'     },
-                ].map((c) => (
-                  <View key={c.key} style={styles.credRow}>
-                    <Text style={styles.credKey}>{c.key}</Text>
-                    <Text style={styles.credVal}>{c.val}</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={styles.infoBox}>
-                <Ionicons name="warning-outline" size={16} color={COLORS.error} />
-                <Text style={[styles.infoText, { color: COLORS.error }]}>
-                  Change default credentials immediately in a production environment.
-                </Text>
-              </View>
             </SectionCard>
 
             <TouchableOpacity style={styles.logoutFullBtn} onPress={handleLogout}>
@@ -669,13 +643,6 @@ const styles = StyleSheet.create({
   },
   aboutLabel: { fontSize: 13, color: COLORS.textMuted },
   aboutValue: { fontSize: 13, fontWeight: '600', color: COLORS.text },
-  credBox: { backgroundColor: COLORS.background, borderRadius: 10, padding: 14, marginBottom: 4 },
-  credRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border,
-  },
-  credKey: { fontSize: 13, color: COLORS.textMuted, fontWeight: '500' },
-  credVal: { fontSize: 13, fontWeight: '700', color: COLORS.secondary },
   logoutFullBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: '#fff', borderRadius: 14, padding: 16,
@@ -683,7 +650,6 @@ const styles = StyleSheet.create({
   },
   logoutFullText: { fontSize: 15, fontWeight: '700', color: COLORS.error },
   
-  // Modal layout styling
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   modalContent: { backgroundColor: '#fff', borderRadius: 16, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
