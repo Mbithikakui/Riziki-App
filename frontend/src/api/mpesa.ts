@@ -53,28 +53,28 @@ export interface ScheduledPayment {
 
 // 🔎 Config
 export const getMpesaConfig = async (): Promise<MpesaConfig> => {
-  const response = await api.get<MpesaConfig>('/payments/config/');
+  const response = await api.get<MpesaConfig>('/mpesa/config/');
   return response.data;
 };
 
 export const updateMpesaConfig = async (data: Partial<MpesaConfig>): Promise<MpesaConfig> => {
-  const response = await api.put('/payments/config/', data);
+  const response = await api.put('/mpesa/config/', data);
   return response.data;
 };
 
 // 📲 Transactions
 export const initiateSTKPush = async (payload: STKPushPayload) => {
-  const response = await api.post('/payments/stk-push/', payload);
+  const response = await api.post('/mpesa/stk-push/', payload);
   return response.data;
 };
 
 export const initiateB2C = async (payload: B2CPayload) => {
-  const response = await api.post('/payments/b2c/', payload);
+  const response = await api.post('/mpesa/b2c/', payload);
   return response.data;
 };
 
 export const initiateB2B = async (payload: B2BPayload) => {
-  const response = await api.post('/payments/b2b/', payload);
+  const response = await api.post('/mpesa/b2b/', payload);
   return response.data;
 };
 
@@ -85,7 +85,7 @@ export const registerC2BURL = async (payload: {
   response_type: string;
   admin_passkey: string;
 }) => {
-  const response = await api.post('/payments/c2b/register/', payload);
+  const response = await api.post('/mpesa/c2b/register/', payload);
   return response.data;
 };
 
@@ -95,7 +95,7 @@ export const simulateC2B = async (payload: {
   bill_ref_number?: string;
   admin_passkey: string;
 }) => {
-  const response = await api.post('/payments/c2b/simulate/', payload);
+  const response = await api.post('/mpesa/c2b/simulate/', payload);
   return response.data;
 };
 
@@ -104,12 +104,12 @@ export const queryTransactionStatus = async (payload: {
   transaction_id: string;
   admin_passkey: string;
 }) => {
-  const response = await api.post('/payments/status/', payload);
+  const response = await api.post('/mpesa/status/', payload);
   return response.data;
 };
 
 export const queryAccountBalance = async () => {
-  const response = await api.get('/payments/balance/');
+  const response = await api.get('/mpesa/balance/');
   return response.data;
 };
 
@@ -119,13 +119,13 @@ export const reverseTransaction = async (payload: {
   remarks: string;
   admin_passkey: string;
 }) => {
-  const response = await api.post('/payments/reversal/', payload);
+  const response = await api.post('/mpesa/reversal/', payload);
   return response.data;
 };
 
 // 📅 Scheduled Payments
 export const getScheduledPayments = async (): Promise<ScheduledPayment[]> => {
-  const response = await api.get('/payments/scheduled/');
+  const response = await api.get('/mpesa/scheduled/');
   return response.data;
 };
 
@@ -138,12 +138,12 @@ export const createScheduledPayment = async (payload: {
   scheduled_at: string;
   admin_passkey: string;
 }): Promise<ScheduledPayment> => {
-  const response = await api.post('/payments/scheduled/', payload);
+  const response = await api.post('/mpesa/scheduled/', payload);
   return response.data;
 };
 
 export const cancelScheduledPayment = async (id: number): Promise<void> => {
-  await api.delete(`/payments/scheduled/${id}/`);
+  await api.delete(`/mpesa/scheduled/${id}/`);
 };
 
 // ── 🔗 EXPORT ALIASES TO MATCH FRONTEND EXPECTATIONS ──
