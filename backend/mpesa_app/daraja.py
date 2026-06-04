@@ -14,7 +14,7 @@ PRODUCTION_BASE_URL = 'https://api.safaricom.co.ke'
 
 
 def _get_base_url() -> str:
-    env = getattr(settings, 'MPESA_ENVIRONMENT', 'sandbox')
+    env = getattr(settings, 'MPESA_ENVIRONMENT', 'production').lower()
     return PRODUCTION_BASE_URL if env == 'production' else SANDBOX_BASE_URL
 
 
