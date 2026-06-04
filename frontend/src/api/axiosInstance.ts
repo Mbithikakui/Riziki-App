@@ -26,6 +26,15 @@ api.interceptors.request.use(
     if (token && config.headers) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    
+    // Clean up endpoint paths to make sure we don't accidentally send /api/api/mpesa/
+    if (config.url && config.url.startsWith('/api/')) {
+      config.url = config.url.replace('/api/', '/');
+    }
+    if (config.url && config.url.startsWith('/payments/')) {
+      config.url = config.url.replace('/payments/', '/mpesa/');
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
