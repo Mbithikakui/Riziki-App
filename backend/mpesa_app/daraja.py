@@ -2,6 +2,7 @@
 """
 Daraja API helper — all M-Pesa API interactions live here.
 """
+import os
 import base64
 import hashlib
 import requests
@@ -14,15 +15,16 @@ PRODUCTION_BASE_URL = 'https://api.safaricom.co.ke'
 
 
 def _get_base_url() -> str:
-    env = getattr(settings, 'MPESA_ENVIRONMENT', 'production').lower()
+    # Check Django configuration, fallback to system env, default to production if completely missing
+    env = getattr(settings, 'MPESA_ENVIRONMENT', os.getenv('MPESA_ENVIRONMENT', 'production')).lower()
     return PRODUCTION_BASE_URL if env == 'production' else SANDBOX_BASE_URL
 
 
 def get_access_token() -> str:
     """Fetch OAuth access token from Daraja API."""
     base_url = _get_base_url()
-    consumer_key = settings.MPESA_CONSUMER_KEY
-    consumer_secret = settings.MPESA_CONSUMER_SECRET
+    consumer_key = getattr(settings, 'MPESA_CONSUMER_KEY', '')
+    consumer_secret = getattr(settings, 'MPESA_CONSUMER_SECRET', '')
 
     credentials = f"{consumer_key}:{consumer_secret}"
     encoded = base64.b64encode(credentials.encode()).decode()
@@ -61,8 +63,8 @@ def stk_push(
     """Initiate Lipa Na M-Pesa Online (STK Push)."""
     access_token = get_access_token()
     base_url = _get_base_url()
-    shortcode = settings.MPESA_SHORTCODE
-    passkey = settings.MPESA_PASSKEY
+    shortcode = getattr(settings, 'MPESA_SHORTCODE', '')
+    passkey = getattr(settings, 'MPESA_PASSKEY', '')
     timestamp = _get_timestamp()
     password = _generate_password(shortcode, passkey, timestamp)
 
@@ -80,12 +82,11 @@ def stk_push(
         'PartyA': phone,
         'PartyB': shortcode,
         'PhoneNumber': phone,
-        'CallBackURL': callback_url or settings.MPESA_CALLBACK_URL,
+        'CallBackURL': callback_url or getattr(settings, 'MPESA_CALLBACK_URL', ''),
         'AccountReference': account_reference,
         'TransactionDesc': transaction_desc,
     }
 
-    # CRITICAL FIX: Safaricom STK Push routes via '/mpesa/', NOT '/payments/'
     response = requests.post(
         f"{base_url}/mpesa/stkpush/v1/processrequest",
         json=payload,
@@ -116,19 +117,18 @@ def b2c_payment(
         phone = '254' + phone[1:]
 
     payload = {
-        'InitiatorName': settings.MPESA_INITIATOR_NAME,
-        'SecurityCredential': settings.MPESA_SECURITY_CREDENTIAL,
+        'InitiatorName': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
+        'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
         'CommandID': command_id,  # SalaryPayment | BusinessPayment | PromotionPayment
         'Amount': int(amount),
-        'PartyA': settings.MPESA_SHORTCODE,
+        'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
         'PartyB': phone,
         'Remarks': remarks,
-        'QueueTimeOutURL': settings.MPESA_B2C_QUEUE_TIMEOUT_URL,
-        'ResultURL': settings.MPESA_B2C_RESULT_URL,
-        'Occassion': occasion,
+        'QueueTimeOutURL': getattr(settings, 'MPESA_B2C_QUEUE_TIMEOUT_URL', ''),
+        'ResultURL': getattr(settings, 'MPESA_B2C_RESULT_URL', ''),
+        'Occasion': occasion,  # Fixed Safaricom parameter name validation typo
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/b2c/v1/paymentrequest",
         json=payload,
@@ -155,21 +155,20 @@ def b2b_payment(
     base_url = _get_base_url()
 
     payload = {
-        'Initiator': settings.MPESA_INITIATOR_NAME,
-        'SecurityCredential': settings.MPESA_SECURITY_CREDENTIAL,
+        'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
+        'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
         'CommandID': command_id,  # BusinessPayBill | MerchantToMerchantTransfer
         'SenderIdentifierType': '4',
         'RecieverIdentifierType': '4',
         'Amount': int(amount),
-        'PartyA': settings.MPESA_SHORTCODE,
+        'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
         'PartyB': party_b,
         'AccountReference': account_reference,
         'Remarks': remarks,
-        'QueueTimeOutURL': settings.MPESA_B2B_QUEUE_TIMEOUT_URL,
-        'ResultURL': settings.MPESA_B2B_RESULT_URL,
+        'QueueTimeOutURL': getattr(settings, 'MPESA_B2B_QUEUE_TIMEOUT_URL', ''),
+        'ResultURL': getattr(settings, 'MPESA_B2B_RESULT_URL', ''),
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/b2b/v1/paymentrequest",
         json=payload,
@@ -194,13 +193,12 @@ def register_c2b_url(
     base_url = _get_base_url()
 
     payload = {
-        'ShortCode': settings.MPESA_SHORTCODE,
+        'ShortCode': getattr(settings, 'MPESA_SHORTCODE', ''),
         'ResponseType': response_type,
         'ConfirmationURL': confirmation_url,
         'ValidationURL': validation_url,
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/c2b/v1/registerurl",
         json=payload,
@@ -225,14 +223,13 @@ def simulate_c2b(
     base_url = _get_base_url()
 
     payload = {
-        'ShortCode': settings.MPESA_SHORTCODE,
+        'ShortCode': getattr(settings, 'MPESA_SHORTCODE', ''),
         'CommandID': 'CustomerPayBillOnline',
         'Amount': int(amount),
         'Msisdn': msisdn,
         'BillRefNumber': bill_ref_number,
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/c2b/v1/simulate",
         json=payload,
@@ -252,19 +249,18 @@ def transaction_status(transaction_id: str, remarks: str = 'Query', **kwargs) ->
     base_url = _get_base_url()
 
     payload = {
-        'Initiator': settings.MPESA_INITIATOR_NAME,
-        'SecurityCredential': settings.MPESA_SECURITY_CREDENTIAL,
+        'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
+        'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
         'CommandID': 'TransactionStatusQuery',
         'TransactionID': transaction_id,
-        'PartyA': settings.MPESA_SHORTCODE,
+        'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
         'IdentifierType': '4',
-        'ResultURL': settings.MPESA_BALANCE_RESULT_URL,
-        'QueueTimeOutURL': settings.MPESA_BALANCE_QUEUE_TIMEOUT_URL,
+        'ResultURL': getattr(settings, 'MPESA_BALANCE_RESULT_URL', ''),
+        'QueueTimeOutURL': getattr(settings, 'MPESA_BALANCE_QUEUE_TIMEOUT_URL', ''),
         'Remarks': remarks,
         'Occasion': '',
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/transactionstatus/v1/query",
         json=payload,
@@ -284,17 +280,16 @@ def account_balance(**kwargs) -> dict:
     base_url = _get_base_url()
 
     payload = {
-        'Initiator': settings.MPESA_INITIATOR_NAME,
-        'SecurityCredential': settings.MPESA_SECURITY_CREDENTIAL,
+        'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
+        'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
         'CommandID': 'AccountBalance',
-        'PartyA': settings.MPESA_SHORTCODE,
+        'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
         'IdentifierType': '4',
         'Remarks': 'Balance query',
-        'QueueTimeOutURL': settings.MPESA_BALANCE_QUEUE_TIMEOUT_URL,
-        'ResultURL': settings.MPESA_BALANCE_RESULT_URL,
+        'QueueTimeOutURL': getattr(settings, 'MPESA_BALANCE_QUEUE_TIMEOUT_URL', ''),
+        'ResultURL': getattr(settings, 'MPESA_BALANCE_RESULT_URL', ''),
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/accountbalance/v1/query",
         json=payload,
@@ -320,20 +315,19 @@ def reverse_transaction(
     base_url = _get_base_url()
 
     payload = {
-        'Initiator': settings.MPESA_INITIATOR_NAME,
-        'SecurityCredential': settings.MPESA_SECURITY_CREDENTIAL,
+        'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
+        'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
         'CommandID': 'TransactionReversal',
         'TransactionID': transaction_id,
         'Amount': int(amount),
-        'ReceiverParty': settings.MPESA_SHORTCODE,
+        'ReceiverParty': getattr(settings, 'MPESA_SHORTCODE', ''),
         'ReceiverIdentifierType': '11',
-        'ResultURL': settings.MPESA_REVERSAL_RESULT_URL,
-        'QueueTimeOutURL': settings.MPESA_REVERSAL_QUEUE_TIMEOUT_URL,
+        'ResultURL': getattr(settings, 'MPESA_REVERSAL_RESULT_URL', ''),
+        'QueueTimeOutURL': getattr(settings, 'MPESA_REVERSAL_QUEUE_TIMEOUT_URL', ''),
         'Remarks': remarks,
         'Occasion': occasion,
     }
 
-    # CRITICAL FIX: Changed from /payments/ to /mpesa/ to prevent 404
     response = requests.post(
         f"{base_url}/mpesa/reversal/v1/request",
         json=payload,
