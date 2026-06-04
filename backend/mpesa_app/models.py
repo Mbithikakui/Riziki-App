@@ -1,5 +1,6 @@
 # backend/mpesa_app/models.py
 from django.db import models
+from django.conf import settings
 
 
 class MpesaConfig(models.Model):
@@ -16,7 +17,7 @@ class MpesaConfig(models.Model):
     environment = models.CharField(
         max_length=20,
         choices=ENVIRONMENT_CHOICES,
-        default='sandbox'
+        default='production'  # Changed default environment fallback to production
     )
     callback_url = models.URLField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -30,7 +31,20 @@ class MpesaConfig(models.Model):
 
     @classmethod
     def get_config(cls):
-        obj, _ = cls.objects.get_or_create(pk=1)
+        # Fetch or initialize row 1
+        obj, created = cls.objects.get_or_create(pk=1)
+        
+        # Security Fallback: If row 1 was just created fresh in production, 
+        # auto-populate it with the server's setting.py env values so things don't break.
+        if created:
+            obj.consumer_key = getattr(settings, 'MPESA_CONSUMER_KEY', '')
+            obj.consumer_secret = getattr(settings, 'MPESA_CONSUMER_SECRET', '')
+            obj.shortcode = getattr(settings, 'MPESA_SHORTCODE', '')
+            obj.passkey = getattr(settings, 'MPESA_PASSKEY', '')
+            obj.environment = getattr(settings, 'MPESA_ENVIRONMENT', 'production')
+            obj.callback_url = getattr(settings, 'MPESA_CALLBACK_URL', '')
+            obj.save()
+            
         return obj
 
 
