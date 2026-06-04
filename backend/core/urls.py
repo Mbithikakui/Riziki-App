@@ -27,7 +27,7 @@ urlpatterns = [
     path('api/auth/', include('auth_app.urls')),
     path('api/balance/', include('balance_app.urls')),
     path('api/transactions/', include('transactions_app.urls')),
-    path('api/payments/', include('mpesa_app.urls')),
+    path('api/mpesa/', include('mpesa_app.urls')),
     path('api/clients/', include('clients_app.urls')),
     path('api/receipts/', include('receipts_app.urls')),
 ]
