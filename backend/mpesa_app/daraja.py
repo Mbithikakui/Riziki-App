@@ -60,9 +60,11 @@ def stk_push(
     callback_url: str,
     **kwargs
 ) -> dict:
-    """Initiate Lipa Na M-Pesa Online (STK Push)."""
+    """Initiate Lipa Na M-Pesa Online (STK Push) using Buy Goods Vetted Parameters."""
     access_token = get_access_token()
     base_url = _get_base_url()
+    
+    # In Buy Goods (Till), the shortcode variable represents your Head Office/Till ID used to authenticate
     shortcode = getattr(settings, 'MPESA_SHORTCODE', '')
     passkey = getattr(settings, 'MPESA_PASSKEY', '')
     timestamp = _get_timestamp()
@@ -73,14 +75,18 @@ def stk_push(
     if phone.startswith('0'):
         phone = '254' + phone[1:]
 
+    # For Buy Goods, PartyB must be the actual target Store Number (Till Number) receiving the cash, 
+    # fallback to the primary shortcode if an explicit store number isn't passed in kwargs
+    store_number = kwargs.get('store_number', shortcode)
+
     payload = {
         'BusinessShortCode': shortcode,
         'Password': password,
         'Timestamp': timestamp,
-        'TransactionType': 'CustomerPayBillOnline',
+        'TransactionType': 'CustomerBuyGoodsOnline', # Updated from CustomerPayBillOnline
         'Amount': int(amount),
         'PartyA': phone,
-        'PartyB': shortcode,
+        'PartyB': store_number,                       # Must be the Till / Store Number receiving funds
         'PhoneNumber': phone,
         'CallBackURL': callback_url or getattr(settings, 'MPESA_CALLBACK_URL', ''),
         'AccountReference': account_reference,
@@ -126,7 +132,7 @@ def b2c_payment(
         'Remarks': remarks,
         'QueueTimeOutURL': getattr(settings, 'MPESA_B2C_QUEUE_TIMEOUT_URL', ''),
         'ResultURL': getattr(settings, 'MPESA_B2C_RESULT_URL', ''),
-        'Occasion': occasion,  # Fixed Safaricom parameter name validation typo
+        'Occasion': occasion,
     }
 
     response = requests.post(
@@ -224,7 +230,7 @@ def simulate_c2b(
 
     payload = {
         'ShortCode': getattr(settings, 'MPESA_SHORTCODE', ''),
-        'CommandID': 'CustomerPayBillOnline',
+        'CommandID': 'CustomerBuyGoodsOnline', # Updated from CustomerPayBillOnline
         'Amount': int(amount),
         'Msisdn': msisdn,
         'BillRefNumber': bill_ref_number,
