@@ -126,7 +126,7 @@ class B2CView(APIView):
                 amount=int(amount_kes),
                 command_id=data['command_id'],
                 remarks=data['remarks'],
-                occasion=data.get('occasion', data.get('occassion', '')),
+                occasion=data.get('occasion', data.get('occasion', '')),
             )
         except Exception as e:
             logger.error(f"Daraja B2C Gateway Connection Timeout or Exception: {str(e)}")
