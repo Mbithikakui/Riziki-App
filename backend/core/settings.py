@@ -19,11 +19,16 @@ DEBUG        = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-gorged.ngrok-free.dev,riziki-backend-7of1.onrender.com').split(',')
 
 # ─── CSRF Trusted Origins ─────────────────────────────────────────────────────
-# Mandatory safety layer for Django 4.0+ admin form processing in production
-CSRF_TRUSTED_ORIGINS = os.getenv(
-    'CSRF_TRUSTED_ORIGINS',
-    'https://riziki-backend-7of1.onrender.com,http://localhost:3000,https://riziki-app.vercel.app'
-).split(',')
+# Mandatory safety layer for Django 4.0+ admin form processing in production.
+# Includes Safaricom API Gateway endpoints to prevent 403 validation drops on webhooks.
+DEFAULT_TRUSTED_ORIGINS = (
+    'https://riziki-backend-7of1.onrender.com,'
+    'http://localhost:3000,'
+    'https://riziki-app.vercel.app,'
+    'https://api.safaricom.co.ke,'
+    'https://sandbox.safaricom.co.ke'
+)
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', DEFAULT_TRUSTED_ORIGINS).split(',')
 
 # ─── Applications ────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
@@ -181,12 +186,12 @@ CORS_ALLOW_CREDENTIALS = True
 ADMIN_PASSKEY = os.getenv('ADMIN_PASSKEY', '1234')
 
 # ─── M-Pesa Integration ───────────────────────────────────────────────────────
-MPESA_CONSUMER_KEY         = os.getenv('MPESA_CONSUMER_KEY',          '')
-MPESA_CONSUMER_SECRET      = os.getenv('MPESA_CONSUMER_SECRET',       '')
-MPESA_SHORTCODE            = os.getenv('MPESA_SHORTCODE',             '')
-MPESA_PASSKEY              = os.getenv('MPESA_PASSKEY',               '')
+MPESA_CONSUMER_KEY         = os.getenv('MPESA_CONSUMER_KEY',           '')
+MPESA_CONSUMER_SECRET      = os.getenv('MPESA_CONSUMER_SECRET',        '')
+MPESA_SHORTCODE            = os.getenv('MPESA_SHORTCODE',              '')
+MPESA_PASSKEY              = os.getenv('MPESA_PASSKEY',                '')
 MPESA_ENVIRONMENT          = os.getenv('MPESA_ENVIRONMENT',           'production')  # 'sandbox' or 'production'
-MPESA_CALLBACK_URL         = os.getenv('MPESA_CALLBACK_URL',          '')
+MPESA_CALLBACK_URL         = os.getenv('MPESA_CALLBACK_URL',           '')
 
 # B2C Configurations
 MPESA_B2C_RESULT_URL        = os.getenv('MPESA_B2C_RESULT_URL',        '')
@@ -197,7 +202,7 @@ MPESA_B2B_RESULT_URL        = os.getenv('MPESA_B2B_RESULT_URL',        '')
 MPESA_B2B_QUEUE_TIMEOUT_URL  = os.getenv('MPESA_B2B_QUEUE_TIMEOUT_URL',  '')
 
 # Reversal Configurations
-MPESA_REVERSAL_RESULT_URL   = os.getenv('MPESA_REVERSAL_RESULT_URL',   '')
+MPESA_REVERSAL_RESULT_URL   = os.getenv('MPESA_REVERSAL_RESULT_URL',    '')
 MPESA_REVERSAL_QUEUE_TIMEOUT_URL = os.getenv('MPESA_REVERSAL_QUEUE_TIMEOUT_URL', '')
 
 # Initiator Configurations
