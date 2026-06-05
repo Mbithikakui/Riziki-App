@@ -1,3 +1,4 @@
+# mpesa/views.py
 from decimal import Decimal
 import logging
 from rest_framework.views import APIView
@@ -6,6 +7,9 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from transactions_app.models import Transaction
 from balance_app.models import Balance
+
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 from .models import MpesaConfig, ScheduledPayment
 from .serializers import (
@@ -126,7 +130,7 @@ class B2CView(APIView):
                 amount=int(amount_kes),
                 command_id=data['command_id'],
                 remarks=data['remarks'],
-                occasion=data.get('occasion', data.get('occasion', '')),
+                occasion=data.get('occasion', ''),
             )
         except Exception as e:
             logger.error(f"Daraja B2C Gateway Connection Timeout or Exception: {str(e)}")
@@ -345,10 +349,16 @@ class ReversalView(APIView):
         })
 
 
+# ── EXTERNAL SAFARICOM PUBLIC CALLBACK CHANNELS ──
+
+@method_decorator(csrf_exempt, name='dispatch')
 class STKCallbackView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []  # Explicitly isolate from global REST auth validation strings
 
     def post(self, request):
+        logger.info(f"[MPESA CALLBACK] STK Push payload received: {request.data}")
+        
         body = request.data.get('Body', {})
         stk_callback = body.get('stkCallback', {})
         result_code = stk_callback.get('ResultCode', -1)
@@ -357,6 +367,7 @@ class STKCallbackView(APIView):
         try:
             tx = Transaction.objects.get(checkout_request_id=checkout_request_id)
         except Transaction.DoesNotExist:
+            logger.error(f"[MPESA CALLBACK] No pending STK trans matches checkout id: {checkout_request_id}")
             return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
         if result_code == 0:
@@ -370,18 +381,24 @@ class STKCallbackView(APIView):
             # Credit the incoming payment directly into your system balance
             balance = Balance.get_balance()
             balance.credit(tx.amount_kes)
+            logger.info(f"[MPESA CALLBACK] STK Push succeeded for tx ID: {tx.id}. Credited system ledger.")
         else:
             tx.status = 'FAILED'
             tx.raw_response = stk_callback
             tx.save()
+            logger.warning(f"[MPESA CALLBACK] STK Push transaction {tx.id} rejected with Code: {result_code}")
 
         return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class B2CResultView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []  # Explicitly isolate from global REST auth validation strings
 
     def post(self, request):
+        logger.info(f"[MPESA CALLBACK] B2C payout result payload received: {request.data}")
+        
         result = request.data.get('Result', {})
         result_code = result.get('ResultCode', -1)
         conversation_id = result.get('ConversationID')
@@ -399,6 +416,7 @@ class B2CResultView(APIView):
                 tx.mpesa_receipt_number = transaction_id
                 tx.raw_response = result
                 tx.save()
+                logger.info(f"[MPESA CALLBACK] B2C Payout execution successful for tx ID: {tx.id}")
             else:
                 tx.status = 'FAILED'
                 tx.raw_response = result
@@ -406,7 +424,7 @@ class B2CResultView(APIView):
                 
                 balance = Balance.get_balance()
                 balance.credit(tx.amount_kes)
-                logger.info(f"B2C Transaction {tx.id} Failed. Re-credited {tx.amount_kes} KES to organization balance.")
+                logger.info(f"[MPESA CALLBACK] B2C Transaction {tx.id} Failed. Re-credited {tx.amount_kes} KES to organization balance.")
 
         return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
