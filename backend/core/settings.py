@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ─── Security ────────────────────────────────────────────────────────────────
 SECRET_KEY   = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
 DEBUG        = os.getenv('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-gorged.ngrok-free.dev,riziki-backend-7of1.onrender.com').split(',')
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,pants-vitally-gorged.ngrok-free.dev,riziki-backend-7of1.onrender.com,https://api.safaricom.co.ke,https://sandbox.safaricom.co.ke').split(',')
 
 # ─── CSRF Trusted Origins ─────────────────────────────────────────────────────
 # Mandatory safety layer for Django 4.0+ admin form processing in production.
@@ -178,7 +178,7 @@ SIMPLE_JWT = {
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = os.getenv(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:8081,http://localhost:19006,http://pants-vitally-gorged.ngrok-free.dev,https://riziki-backend-7of1.onrender.com,https://riziki-app.vercel.app'
+    'http://localhost:3000,http://localhost:8081,http://localhost:19006,http://pants-vitally-gorged.ngrok-free.dev,https://riziki-backend-7of1.onrender.com,https://riziki-app.vercel.app,https://api.safaricom.co.ke,https://sandbox.safaricom.co.ke'
 ).split(',')
 CORS_ALLOW_CREDENTIALS = True
 
