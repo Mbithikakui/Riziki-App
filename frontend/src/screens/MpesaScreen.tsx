@@ -6,14 +6,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { stkPush, b2cPayment, b2bPayment, reverseTransaction, checkTransactionStatus } from '../api/mpesa';
+import { stkPush, b2cPayment, b2bPayment, reverseTransaction, checkTransactionStatus, getMpesaConfig } from '../api/mpesa';
 import PasskeyModal from '../components/PasskeyModal';
 import ClientSelectModal from '../components/ClientSelectModal';
 import { getClients, Client } from '../api/clients';
 import { COLORS } from '../styles/colors';
-
-// Runtime environment flag indicator setup
-const IS_PRODUCTION = process.env.EXPO_PUBLIC_MPESA_ENV === 'production';
 
 type Tab     = 'STK' | 'B2C' | 'B2B' | 'REVERSAL' | 'STATUS';
 type B2BType = 'PAYBILL' | 'BUYGOODS';
@@ -69,6 +66,9 @@ const MpesaScreen = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult]   = useState<any>(null);
 
+  // Dynamic Environment Tracking Variable
+  const [isProduction, setIsProduction] = useState(false);
+
   const [passkeyVisible, setPasskeyVisible] = useState(false);
   const [passkeyError, setPasskeyError]     = useState<string | null>(null);
   const [pendingAction, setPendingAction]   = useState<((p: string) => Promise<void>) | null>(null);
@@ -86,7 +86,18 @@ const MpesaScreen = () => {
   const [stat, setStat] = useState({ transaction_id: '' });
 
   useEffect(() => {
+    // 1. Fetch live clients
     getClients().then(setClients).catch((error) => console.error("Failed to fetch clients", error));
+
+    // 2. Query dynamic backend server parameters to match configurations
+    getMpesaConfig()
+      .then((config) => {
+        setIsProduction(config.environment === 'production');
+      })
+      .catch((error) => {
+        console.error("Failed to read mpesa live runtime variable parameters:", error);
+        setIsProduction(false); // Fallback boundary safety safe state
+      });
   }, []);
 
   const populateFormInputs = useCallback((client: Client, targetTab: Tab) => {
@@ -217,7 +228,6 @@ const MpesaScreen = () => {
   const handleReversal = () => {
     if (!rev.transaction_id || !rev.amount) { Alert.alert('Missing Fields', 'Transaction ID and amount are required.'); return; }
     promptPasskey(async (passkey) => {
-      // Pass dynamic parameter overrides for Till context matching if necessary
       const res = await reverseTransaction({ 
         transaction_id: rev.transaction_id, 
         amount: rev.amount, 
@@ -267,7 +277,6 @@ const MpesaScreen = () => {
         </ScrollView>
       </View>
 
-      {/* ── Client Selection Modal Drawer ── */}
       <ClientSelectModal 
         visible={clientSelectVisible} 
         clients={clients} 
@@ -277,7 +286,6 @@ const MpesaScreen = () => {
 
       <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
 
-        {/* Dynamic Context Profile Link Status Selector Block */}
         {activeClient ? (
           <View style={styles.contextHeaderBadge}>
             <View style={styles.contextHeaderLeft}>
@@ -434,10 +442,10 @@ const MpesaScreen = () => {
           </View>
         )}
 
-        {/* ── Info / Environment Status Card ── */}
+        {/* ── Dynamic Integrated Environment Status Card ── */}
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Environment Management</Text>
-          {IS_PRODUCTION ? (
+          {isProduction ? (
             <View style={styles.infoEnvBadgeProd}>
               <Ionicons name="shield-checkmark-outline" size={14} color="#065f46" />
               <Text style={styles.infoEnvTextProd}>Production Live Mode — Real-time money transactions active</Text>
