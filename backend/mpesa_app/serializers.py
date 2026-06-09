@@ -28,7 +28,7 @@ class B2CSerializer(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=1)
     command_id = serializers.ChoiceField(choices=COMMAND_CHOICES)
     remarks = serializers.CharField(max_length=255)
-    occassion = serializers.CharField(max_length=255, required=False, default='')
+    occasion = serializers.CharField(max_length=255, required=False, default='')
 
 
 class B2BSerializer(serializers.Serializer):
