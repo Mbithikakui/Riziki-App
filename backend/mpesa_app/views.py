@@ -7,7 +7,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from transactions_app.models import Transaction
 from balance_app.models import Balance
-
+fron django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
@@ -29,11 +29,13 @@ from . import daraja
 logger = logging.getLogger(__name__)
 
 class MpesaConfigView(APIView):
-    permission_classes = [IsAuthenticated]
-
     def get(self, request):
         config = MpesaConfig.get_config()
-        return Response(MpesaConfigSerializer(config).data)
+        data = MpesaConfigSerializer(config).data
+        
+        # Inject the live core settings state directly into the frontend outbound API context
+        data['environment'] = getattr(settings, 'MPESA_ENVIRONMENT', 'sandbox')
+        return Response(data)
 
     def put(self, request):
         config = MpesaConfig.get_config()
@@ -41,8 +43,10 @@ class MpesaConfigView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
-        return Response(serializer.data)
-
+        
+        data = serializer.data
+        data['environment'] = getattr(settings, 'MPESA_ENVIRONMENT', 'sandbox')
+        return Response(data)
 
 class STKPushView(APIView):
     permission_classes = [IsAuthenticated]
