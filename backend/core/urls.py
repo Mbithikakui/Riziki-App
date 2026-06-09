@@ -27,7 +27,10 @@ urlpatterns = [
     path('api/auth/', include('auth_app.urls')),
     path('api/balance/', include('balance_app.urls')),
     path('api/transactions/', include('transactions_app.urls')),
-    path('api/mpesa/', include('mpesa_app.urls')),
+    
+    # FIX: Updated routing prefix to 'mpesa_app' to explicitly match your .env setup
+    path('api/mpesa_app/', include('mpesa_app.urls')),
+    
     path('api/clients/', include('clients_app.urls')),
     path('api/receipts/', include('receipts_app.urls')),
 ]
