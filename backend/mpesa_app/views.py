@@ -71,7 +71,7 @@ class STKPushView(APIView):
                 amount=int(data['amount']),
                 account_reference=data['account_reference'],
                 transaction_desc=data['transaction_desc'],
-                callback_url='',
+                callback_url=data.get('callback_url'),
             )
         except Exception as e:
             logger.error(f"Daraja STK Push Outbound Timeout or Exception: {str(e)}")

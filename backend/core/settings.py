@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
+APPEND_SLASH = False  # Prevents Django from appending slashes to URLs, ensuring cleaner API endpoints.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ─── Security ────────────────────────────────────────────────────────────────
