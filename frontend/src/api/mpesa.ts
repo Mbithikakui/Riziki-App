@@ -1,5 +1,5 @@
 // frontend/src/api/mpesa.ts
-import api from './axiosInstance'; // Updated to import the central axiosInstance
+import api from './axiosInstance'; // Central axiosInstance
 
 export interface MpesaConfig {
   id: number;
@@ -36,6 +36,14 @@ export interface B2BPayload {
   account_reference: string;
   remarks: string;
   admin_passkey: string;
+}
+
+export interface ReversalPayload {
+  transaction_id: string;
+  amount: string | number;
+  remarks: string;
+  admin_passkey: string;
+  receiver_identifier_type?: string; // 👈 Clears TypeScript mismatch error for Reversals
 }
 
 export interface ScheduledPayment {
@@ -113,12 +121,7 @@ export const queryAccountBalance = async () => {
   return response.data;
 };
 
-export const reverseTransaction = async (payload: {
-  transaction_id: string;
-  amount: string | number;
-  remarks: string;
-  admin_passkey: string;
-}) => {
+export const reverseTransaction = async (payload: ReversalPayload) => {
   const response = await api.post('/mpesa/reversal/', payload);
   return response.data;
 };

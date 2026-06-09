@@ -12,6 +12,9 @@ import ClientSelectModal from '../components/ClientSelectModal';
 import { getClients, Client } from '../api/clients';
 import { COLORS } from '../styles/colors';
 
+// Runtime environment flag indicator setup
+const IS_PRODUCTION = process.env.EXPO_PUBLIC_MPESA_ENV === 'production';
+
 type Tab     = 'STK' | 'B2C' | 'B2B' | 'REVERSAL' | 'STATUS';
 type B2BType = 'PAYBILL' | 'BUYGOODS';
 
@@ -33,7 +36,6 @@ interface InputFieldProps {
   disabled?: boolean;
 }
 
-// ✅ Stable component outside parent — prevents re-mount and cursor loss
 const InputField: React.FC<InputFieldProps> = ({
   label, value, onChange, placeholder = '',
   keyboard = 'default', multiline = false, disabled = false,
@@ -94,7 +96,7 @@ const MpesaScreen = () => {
       if (b2bType === 'PAYBILL') {
         setB2b((p) => ({ ...p, shortcode: client.paybill_number || '', accountRef: client.account_number || '' }));
       } else {
-        setB2b((p) => ({ ...p, shortcode: client.till_number || '', accountRef: '' }));
+        setB2b((p) => ({ ...p, shortcode: client.till_number || '3302715', accountRef: '' }));
       }
     }
   }, [b2bType]);
@@ -122,7 +124,7 @@ const MpesaScreen = () => {
       setB2bType('PAYBILL');
     } else if (client.paybill_number && client.till_number) {
       setB2bType('PAYBILL');
-      Alert.alert("Dual Registry", `${client.name} has both Paybill and Till numbers. Use the toggle switch to alternative variants.`);
+      Alert.alert("Dual Registry", `${client.name} has both Paybill and Till numbers. Use the toggle switch to alternate variants.`);
     }
 
     populateFormInputs(client, tab);
@@ -215,11 +217,13 @@ const MpesaScreen = () => {
   const handleReversal = () => {
     if (!rev.transaction_id || !rev.amount) { Alert.alert('Missing Fields', 'Transaction ID and amount are required.'); return; }
     promptPasskey(async (passkey) => {
+      // Pass dynamic parameter overrides for Till context matching if necessary
       const res = await reverseTransaction({ 
         transaction_id: rev.transaction_id, 
         amount: rev.amount, 
         remarks: rev.remarks, 
-        admin_passkey: passkey 
+        admin_passkey: passkey,
+        receiver_identifier_type: '11' 
       });
       setResult({ tab: 'REVERSAL', data: res });
       Alert.alert('✅ Reversal Initiated', 'Transaction reversal request sent.');
@@ -363,7 +367,7 @@ const MpesaScreen = () => {
               label={b2bType === 'PAYBILL' ? "Business Paybill Number *" : "Merchant Till Number *"} 
               value={b2b.shortcode} 
               onChange={(v: string) => setB2b({...b2b, shortcode: v})} 
-              placeholder={b2bType === 'PAYBILL' ? "e.g. 222222" : "e.g. 174379"} 
+              placeholder={b2bType === 'PAYBILL' ? "e.g. 222222" : "e.g. 3302715"} 
               keyboard="numeric" 
               disabled={loading}
             />
@@ -430,13 +434,20 @@ const MpesaScreen = () => {
           </View>
         )}
 
-        {/* ── Info ── */}
+        {/* ── Info / Environment Status Card ── */}
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Environment</Text>
-          <View style={styles.infoEnvBadge}>
-            <Ionicons name="flask-outline" size={14} color="#D97706" />
-            <Text style={styles.infoEnvText}>Sandbox Mode Active — No real money is moved</Text>
-          </View>
+          <Text style={styles.infoTitle}>Environment Management</Text>
+          {IS_PRODUCTION ? (
+            <View style={styles.infoEnvBadgeProd}>
+              <Ionicons name="shield-checkmark-outline" size={14} color="#065f46" />
+              <Text style={styles.infoEnvTextProd}>Production Live Mode — Real-time money transactions active</Text>
+            </View>
+          ) : (
+            <View style={styles.infoEnvBadge}>
+              <Ionicons name="flask-outline" size={14} color="#D97706" />
+              <Text style={styles.infoEnvText}>Sandbox Mode Active — No real money is moved</Text>
+            </View>
+          )}
         </View>
 
         <View style={{ height: 40 }} />
@@ -525,10 +536,27 @@ const styles = StyleSheet.create({
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   resultTitle:  { fontSize: 14, fontWeight: '700', color: COLORS.text },
   resultJson: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, color: COLORS.secondary, backgroundColor: COLORS.background, padding: 12, borderRadius: 8 },
+  
   infoCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
-  infoTitle:    { fontSize: 13, fontWeight: '700', color: COLORS.secondary, marginBottom: 10 },
+  infoTitle:     { fontSize: 13, fontWeight: '700', color: COLORS.secondary, marginBottom: 10 },
   infoEnvBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF3C7', borderRadius: 8, padding: 10, marginBottom: 8 },
   infoEnvText:  { fontSize: 12, color: '#D97706', fontWeight: '600' },
+  infoEnvBadgeProd: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    backgroundColor: '#d1fae5', 
+    borderRadius: 8, 
+    padding: 10, 
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#a7f3d0'
+  },
+  infoEnvTextProd: { 
+    fontSize: 12, 
+    color: '#065f46', 
+    fontWeight: '700' 
+  },
 });
 
 export default MpesaScreen;
