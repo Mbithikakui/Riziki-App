@@ -1,4 +1,3 @@
-# backend/mpesa_app/daraja.py
 """
 Daraja API helper — all M-Pesa API interactions live here.
 """
@@ -15,7 +14,6 @@ PRODUCTION_BASE_URL = 'https://api.safaricom.co.ke'
 
 
 def _get_base_url() -> str:
-    # Check Django configuration, fallback to system env, default to production if completely missing
     env = getattr(settings, 'MPESA_ENVIRONMENT', os.getenv('MPESA_ENVIRONMENT', 'production')).lower()
     return PRODUCTION_BASE_URL if env == 'production' else SANDBOX_BASE_URL
 
@@ -38,7 +36,6 @@ def get_access_token() -> str:
     return response.json().get('access_token', '')
 
 
-# Retain alias for any internal imports using the old private namespace name
 _get_access_token = get_access_token
 
 
@@ -60,36 +57,32 @@ def stk_push(
     callback_url: str,
     **kwargs
 ) -> dict:
-    """Initiate Lipa Na M-Pesa Online (STK Push) using Buy Goods Vetted Parameters."""
+    """Initiate Lipa Na M-Pesa Online (STK Push) using Buy Goods Parameters."""
     access_token = get_access_token()
     base_url = _get_base_url()
     
-    # In Buy Goods (Till), the shortcode variable represents your Head Office/Till ID used to authenticate
     shortcode = getattr(settings, 'MPESA_SHORTCODE', '')
     passkey = getattr(settings, 'MPESA_PASSKEY', '')
     timestamp = _get_timestamp()
     password = _generate_password(shortcode, passkey, timestamp)
 
-    # Normalize phone number to 2547XXXXXXXX
     phone = phone_number.strip().replace('+', '').replace(' ', '')
     if phone.startswith('0'):
         phone = '254' + phone[1:]
 
-    # For Buy Goods, PartyB must be the actual target Store Number (Till Number) receiving the cash, 
-    # fallback to the primary shortcode if an explicit store number isn't passed in kwargs
-    store_number = kwargs.get('store_number', shortcode)
+    till_number = kwargs.get('till_number', '3302715')
 
     payload = {
         'BusinessShortCode': shortcode,
         'Password': password,
         'Timestamp': timestamp,
-        'TransactionType': 'CustomerBuyGoodsOnline', # Updated from CustomerPayBillOnline
+        'TransactionType': 'CustomerBuyGoodsOnline',
         'Amount': int(amount),
         'PartyA': phone,
-        'PartyB': store_number,                       # Must be the Till / Store Number receiving funds
+        'PartyB': till_number,
         'PhoneNumber': phone,
         'CallBackURL': callback_url or getattr(settings, 'MPESA_CALLBACK_URL', ''),
-        'AccountReference': account_reference,
+        'AccountReference': account_reference or 'RizikiApp',
         'TransactionDesc': transaction_desc,
     }
 
@@ -125,7 +118,7 @@ def b2c_payment(
     payload = {
         'InitiatorName': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
         'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
-        'CommandID': command_id,  # SalaryPayment | BusinessPayment | PromotionPayment
+        'CommandID': command_id,
         'Amount': int(amount),
         'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
         'PartyB': phone,
@@ -156,16 +149,21 @@ def b2b_payment(
     remarks: str,
     **kwargs
 ) -> dict:
-    """Send money from business to business (B2B)."""
+    """Send money from business to business (B2B) - Responsive to Paybill and Tills."""
     access_token = get_access_token()
     base_url = _get_base_url()
+
+    if command_id == 'BusinessPayBill':
+        receiver_identifier_type = '4'
+    else:
+        receiver_identifier_type = '2'
 
     payload = {
         'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
         'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
-        'CommandID': command_id,  # BusinessPayBill | MerchantToMerchantTransfer
+        'CommandID': command_id,
         'SenderIdentifierType': '4',
-        'RecieverIdentifierType': '4',
+        'RecieverIdentifierType': receiver_identifier_type, 
         'Amount': int(amount),
         'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
         'PartyB': party_b,
@@ -230,7 +228,7 @@ def simulate_c2b(
 
     payload = {
         'ShortCode': getattr(settings, 'MPESA_SHORTCODE', ''),
-        'CommandID': 'CustomerBuyGoodsOnline', # Updated from CustomerPayBillOnline
+        'CommandID': 'CustomerBuyGoodsOnline',
         'Amount': int(amount),
         'Msisdn': msisdn,
         'BillRefNumber': bill_ref_number,
@@ -250,9 +248,12 @@ def simulate_c2b(
 
 
 def transaction_status(transaction_id: str, remarks: str = 'Query', **kwargs) -> dict:
-    """Query transaction status."""
+    """Query transaction status - responsive to business or till queries."""
     access_token = get_access_token()
     base_url = _get_base_url()
+
+    # Pass identifier_type='2' if you are looking up a status tied explicitly to a Till number
+    identifier_type = kwargs.get('identifier_type', '4')
 
     payload = {
         'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
@@ -260,7 +261,7 @@ def transaction_status(transaction_id: str, remarks: str = 'Query', **kwargs) ->
         'CommandID': 'TransactionStatusQuery',
         'TransactionID': transaction_id,
         'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
-        'IdentifierType': '4',
+        'IdentifierType': identifier_type, # 4 for Organization Shortcode, 2 for Merchant Till
         'ResultURL': getattr(settings, 'MPESA_BALANCE_RESULT_URL', ''),
         'QueueTimeOutURL': getattr(settings, 'MPESA_BALANCE_QUEUE_TIMEOUT_URL', ''),
         'Remarks': remarks,
@@ -281,16 +282,20 @@ def transaction_status(transaction_id: str, remarks: str = 'Query', **kwargs) ->
 
 
 def account_balance(**kwargs) -> dict:
-    """Query account balance."""
+    """Query account balance - supports tracking balance on Shortcode or specific Tills."""
     access_token = get_access_token()
     base_url = _get_base_url()
+
+    # Pass identifier_type='2' if checking balance directly on a custom Till Number ledger
+    identifier_type = kwargs.get('identifier_type', '4')
+    party_a = kwargs.get('party_a', getattr(settings, 'MPESA_SHORTCODE', ''))
 
     payload = {
         'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
         'SecurityCredential': getattr(settings, 'MPESA_SECURITY_CREDENTIAL', ''),
         'CommandID': 'AccountBalance',
-        'PartyA': getattr(settings, 'MPESA_SHORTCODE', ''),
-        'IdentifierType': '4',
+        'PartyA': party_a,
+        'IdentifierType': identifier_type, # 4 for Organization Shortcode, 2 for Till Number
         'Remarks': 'Balance query',
         'QueueTimeOutURL': getattr(settings, 'MPESA_BALANCE_QUEUE_TIMEOUT_URL', ''),
         'ResultURL': getattr(settings, 'MPESA_BALANCE_RESULT_URL', ''),
@@ -316,9 +321,12 @@ def reverse_transaction(
     occasion: str = '',
     **kwargs
 ) -> dict:
-    """Reverse a completed M-Pesa transaction."""
+    """Reverse a completed M-Pesa transaction with dynamic receiver configuration."""
     access_token = get_access_token()
     base_url = _get_base_url()
+
+    # 11 is default for organization system-side reversals, but can be altered if required
+    receiver_identifier_type = kwargs.get('receiver_identifier_type', '11')
 
     payload = {
         'Initiator': getattr(settings, 'MPESA_INITIATOR_NAME', ''),
@@ -327,7 +335,7 @@ def reverse_transaction(
         'TransactionID': transaction_id,
         'Amount': int(amount),
         'ReceiverParty': getattr(settings, 'MPESA_SHORTCODE', ''),
-        'ReceiverIdentifierType': '11',
+        'ReceiverIdentifierType': receiver_identifier_type,
         'ResultURL': getattr(settings, 'MPESA_REVERSAL_RESULT_URL', ''),
         'QueueTimeOutURL': getattr(settings, 'MPESA_REVERSAL_QUEUE_TIMEOUT_URL', ''),
         'Remarks': remarks,
