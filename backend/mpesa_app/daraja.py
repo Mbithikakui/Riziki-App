@@ -70,7 +70,7 @@ def stk_push(
     if phone.startswith('0'):
         phone = '254' + phone[1:]
 
-    till_number = kwargs.get('till_number', '3302715')
+    till_number = kwargs.get('till_number', '123456')  # Default till number if not provided, can be overridden via kwargs
 
     payload = {
         'BusinessShortCode': shortcode,
