@@ -12,7 +12,7 @@ from .views import (
     ReversalView,
     STKCallbackView,
     B2CResultView,
-    # B2BResultView,  # Import this if you create a separate view for B2B tracking
+    B2BResultView,  # 👈 Added your new dedicated handler
     ScheduledPaymentListView,
     ScheduledPaymentDetailView,
 )
@@ -35,15 +35,17 @@ urlpatterns = [
 
     # Async Inbound Webhook / Callback Listeners (With trailing slashes)
     path('callback/', STKCallbackView.as_view(), name='mpesa-stk-callback'),
-    
-    # B2C Callbacks (Handles result and timeout webhooks)
+    path('callback', STKCallbackView.as_view()), # 👈 Fallback wrapper if Safaricom drops the trailing slash
+
+    # B2C Callbacks
     path('b2c/result/', B2CResultView.as_view(), name='mpesa-b2c-result'),
+    path('b2c/result', B2CResultView.as_view()),
     path('b2c/timeout/', B2CResultView.as_view(), name='mpesa-b2c-timeout'),
     
-    # B2B Callbacks 
-    # FIX: Point these to your B2B handling logic instead of B2CResultView
-    path('b2b/result/', B2CResultView.as_view(), name='mpesa-b2b-result'),
-    path('b2b/timeout/', B2CResultView.as_view(), name='mpesa-b2b-timeout'),
+    # B2B Callbacks (Point directly to B2B handling views)
+    path('b2b/result/', B2BResultView.as_view(), name='mpesa-b2b-result'),
+    path('b2b/result', B2BResultView.as_view()),
+    path('b2b/timeout/', B2BResultView.as_view(), name='mpesa-b2b-timeout'),
 
     # Standing Orders / Scheduled Disbursals
     path('scheduled/', ScheduledPaymentListView.as_view(), name='mpesa-scheduled-list'),

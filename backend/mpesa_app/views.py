@@ -1,13 +1,13 @@
 # mpesa/views.py
 from decimal import Decimal
 import logging
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from transactions_app.models import Transaction
 from balance_app.models import Balance
-from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 
@@ -32,8 +32,6 @@ class MpesaConfigView(APIView):
     def get(self, request):
         config = MpesaConfig.get_config()
         data = MpesaConfigSerializer(config).data
-        
-        # Inject the live core settings state directly into the frontend outbound API context
         data['environment'] = getattr(settings, 'MPESA_ENVIRONMENT', 'sandbox')
         return Response(data)
 
@@ -47,6 +45,7 @@ class MpesaConfigView(APIView):
         data = serializer.data
         data['environment'] = getattr(settings, 'MPESA_ENVIRONMENT', 'sandbox')
         return Response(data)
+
 
 class STKPushView(APIView):
     permission_classes = [IsAuthenticated]
@@ -65,13 +64,13 @@ class STKPushView(APIView):
 
         data = serializer.validated_data
         try:
-            # Explicit parameters mapped safely with custom exception containment
+            # Fixed: Use settings.MPESA_CALLBACK_URL directly to resolve PENDING issues
             result = daraja.stk_push(
                 phone_number=data['phone_number'],
                 amount=int(data['amount']),
                 account_reference=data['account_reference'],
                 transaction_desc=data['transaction_desc'],
-                callback_url=data.get('callback_url'),
+                callback_url=settings.MPESA_CALLBACK_URL,
             )
         except Exception as e:
             logger.error(f"Daraja STK Push Outbound Timeout or Exception: {str(e)}")
@@ -80,7 +79,6 @@ class STKPushView(APIView):
         amount_kes_dec = Decimal(str(data['amount']))
         amount_usd_dec = amount_kes_dec / Decimal('150.00')
 
-        # Create pending transaction tracking frame
         tx = Transaction.objects.create(
             phone_number=data['phone_number'],
             amount_kes=amount_kes_dec,
@@ -128,7 +126,6 @@ class B2CView(APIView):
             return Response({'error': 'Insufficient balance.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Defends against synchronous system hanging with contained exception parameters
             result = daraja.b2c_payment(
                 phone_number=data['phone_number'],
                 amount=int(amount_kes),
@@ -149,7 +146,6 @@ class B2CView(APIView):
             status='PENDING',
             description=data['remarks'],
             raw_response=result,
-            # Assign Conversation ID if provided by response root mapping to cross-check downstream asynchronously
             checkout_request_id=result.get('ConversationID') or result.get('OriginatorConversationID'),
         )
 
@@ -207,6 +203,7 @@ class B2BView(APIView):
             status='PENDING',
             description=data['remarks'],
             raw_response=result,
+            checkout_request_id=result.get('ConversationID') or result.get('OriginatorConversationID'),
         )
 
         return Response({
@@ -358,7 +355,7 @@ class ReversalView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class STKCallbackView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []  # Explicitly isolate from global REST auth validation strings
+    authentication_classes = []
 
     def post(self, request):
         logger.info(f"[MPESA CALLBACK] STK Push payload received: {request.data}")
@@ -382,7 +379,6 @@ class STKCallbackView(APIView):
             tx.raw_response = stk_callback
             tx.save()
             
-            # Credit the incoming payment directly into your system balance
             balance = Balance.get_balance()
             balance.credit(tx.amount_kes)
             logger.info(f"[MPESA CALLBACK] STK Push succeeded for tx ID: {tx.id}. Credited system ledger.")
@@ -398,7 +394,7 @@ class STKCallbackView(APIView):
 @method_decorator(csrf_exempt, name='dispatch')
 class B2CResultView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []  # Explicitly isolate from global REST auth validation strings
+    authentication_classes = []
 
     def post(self, request):
         logger.info(f"[MPESA CALLBACK] B2C payout result payload received: {request.data}")
@@ -429,6 +425,44 @@ class B2CResultView(APIView):
                 balance = Balance.get_balance()
                 balance.credit(tx.amount_kes)
                 logger.info(f"[MPESA CALLBACK] B2C Transaction {tx.id} Failed. Re-credited {tx.amount_kes} KES to organization balance.")
+
+        return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class B2BResultView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        logger.info(f"[MPESA CALLBACK] B2B transfer result payload received: {request.data}")
+        
+        result = request.data.get('Result', {})
+        result_code = result.get('ResultCode', -1)
+        conversation_id = result.get('ConversationID')
+        transaction_id = result.get('TransactionID', '')
+
+        tx_query = Transaction.objects.filter(type='B2B', status='PENDING')
+        if conversation_id:
+            tx = tx_query.filter(checkout_request_id=conversation_id).first()
+        else:
+            tx = tx_query.order_by('-created_at').first()
+
+        if tx:
+            if result_code == 0:
+                tx.status = 'SUCCESS'
+                tx.mpesa_receipt_number = transaction_id
+                tx.raw_response = result
+                tx.save()
+                logger.info(f"[MPESA CALLBACK] B2B Transfer successful for tx ID: {tx.id}")
+            else:
+                tx.status = 'FAILED'
+                tx.raw_response = result
+                tx.save()
+                
+                balance = Balance.get_balance()
+                balance.credit(tx.amount_kes)
+                logger.info(f"[MPESA CALLBACK] B2B Transaction {tx.id} Failed. Refunded {tx.amount_kes} KES.")
 
         return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
