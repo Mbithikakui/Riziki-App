@@ -375,7 +375,7 @@ const MpesaScreen = () => {
               label={b2bType === 'PAYBILL' ? "Business Paybill Number *" : "Merchant Till Number *"} 
               value={b2b.shortcode} 
               onChange={(v: string) => setB2b({...b2b, shortcode: v})} 
-              placeholder={b2bType === 'PAYBILL' ? "e.g. 222222" : "e.g. 3302715"} 
+              placeholder={b2bType === 'PAYBILL' ? "e.g. 222222" : "e.g. 1234567"} 
               keyboard="numeric" 
               disabled={loading}
             />
