@@ -64,7 +64,6 @@ class STKPushView(APIView):
 
         data = serializer.validated_data
         try:
-            # Fixed: Use settings.MPESA_CALLBACK_URL directly to resolve PENDING issues
             result = daraja.stk_push(
                 phone_number=data['phone_number'],
                 amount=int(data['amount']),
@@ -75,6 +74,15 @@ class STKPushView(APIView):
         except Exception as e:
             logger.error(f"Daraja STK Push Outbound Timeout or Exception: {str(e)}")
             return Response({'error': f'Payment gateway timeout: {str(e)}'}, status=status.HTTP_502_BAD_GATEWAY)
+
+        # ── 🛡️ API HANDSHAKE GUARD ──
+        if 'errorCode' in result or (result.get('ResponseCode') and result.get('ResponseCode') != '0'):
+            error_msg = result.get('errorMessage', 'Safaricom Gateway rejected the STK payload request.')
+            logger.error(f"[MPESA STK REJECTION] Safaricom refused to push STK: {result}")
+            return Response({
+                'error': f'Safaricom Daraja Error: {error_msg}',
+                'raw': result
+            }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
         amount_kes_dec = Decimal(str(data['amount']))
         amount_usd_dec = amount_kes_dec / Decimal('150.00')
@@ -137,6 +145,16 @@ class B2CView(APIView):
             logger.error(f"Daraja B2C Gateway Connection Timeout or Exception: {str(e)}")
             return Response({'error': f'M-Pesa Gateway Connection Failed: {str(e)}'}, status=status.HTTP_502_BAD_GATEWAY)
 
+        # ── 🛡️ API HANDSHAKE GUARD ──
+        if 'errorCode' in result or (result.get('ResponseCode') and result.get('ResponseCode') != '0'):
+            error_msg = result.get('errorMessage', 'Safaricom Gateway rejected the B2C payload request.')
+            logger.error(f"[MPESA B2C REJECTION] Safaricom refused to queue payout: {result}")
+            return Response({
+                'error': f'Safaricom Daraja Error: {error_msg}',
+                'raw': result
+            }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # Successful handshake only - safe to adjust app metrics
         balance.debit(amount_kes)
         tx = Transaction.objects.create(
             phone_number=data['phone_number'],
@@ -150,7 +168,7 @@ class B2CView(APIView):
         )
 
         return Response({
-            'message': 'B2C payment initiated.',
+            'message': 'B2C payment initiated successfully and queued on M-Pesa.',
             'transaction_id': tx.id,
             'raw': result,
             'auto_assigned_passkey_notice': (
@@ -194,6 +212,16 @@ class B2BView(APIView):
             logger.error(f"Daraja B2B Gateway Connection Exception: {str(e)}")
             return Response({'error': f'M-Pesa Gateway Connection Failed: {str(e)}'}, status=status.HTTP_502_BAD_GATEWAY)
 
+        # ── 🛡️ API HANDSHAKE GUARD ──
+        if 'errorCode' in result or (result.get('ResponseCode') and result.get('ResponseCode') != '0'):
+            error_msg = result.get('errorMessage', 'Safaricom Gateway rejected the B2B payload request.')
+            logger.error(f"[MPESA B2B REJECTION] Safaricom refused to queue B2B transfer: {result}")
+            return Response({
+                'error': f'Safaricom Daraja Error: {error_msg}',
+                'raw': result
+            }, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # Successful handshake only - safe to adjust app metrics
         balance.debit(amount_kes)
         tx = Transaction.objects.create(
             recipient_name=data['party_b'],
@@ -207,7 +235,7 @@ class B2BView(APIView):
         )
 
         return Response({
-            'message': 'B2B payment initiated.',
+            'message': 'B2B payment initiated successfully and queued on M-Pesa.',
             'transaction_id': tx.id,
             'raw': result,
             'auto_assigned_passkey_notice': (
